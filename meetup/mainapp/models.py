@@ -30,7 +30,10 @@ class User(models.Model):
                             default='L')
 
     def __str__(self) -> str:
-        return f'{self.full_name}'
+        if self.role == 'L':
+            return f"Telegram id слушателя: {self.tg_id}"
+        elif self.role == 'S':
+            return f'Спикер: {self.full_name}'
 
 
 class Report(models.Model):
