@@ -37,8 +37,8 @@ class Report(models.Model):
     report_title = models.CharField(max_length=50)
     planed_start_time = models.TimeField()
     planed_end_time = models.TimeField()
-    actual_start_time = models.TimeField(null=True)
-    actual_end_time = models.TimeField(null=True)
+    actual_start_time = models.TimeField(blank=True)
+    actual_end_time = models.TimeField(blank=True)
     event = models.ForeignKey(Event, on_delete=models.CASCADE)
     speaker = models.ForeignKey(User, on_delete=models.CASCADE)
 
