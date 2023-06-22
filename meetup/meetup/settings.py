@@ -55,7 +55,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'beautycity.urls'
+ROOT_URLCONF = 'meetup.urls'
 
 TEMPLATES = [
     {
