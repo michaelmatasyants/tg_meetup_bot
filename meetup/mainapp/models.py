@@ -13,6 +13,7 @@ class Event(models.Model):
     start_time = models.TimeField()
     event_name = models.CharField(max_length=50)
     place = models.CharField(max_length=50)
+    active = models.BooleanField(default=False)
 
     def __str__(self) -> str:
         return f'{self.event_name} {self.date}'
@@ -20,6 +21,7 @@ class Event(models.Model):
 
 class User(models.Model):
     tg_id = models.CharField(max_length=30, unique=True)
+    tg_nickname = models.CharField(max_length=30, blank=True)
     email = models.EmailField(
         max_length=254, blank=True,
         validators=[validators.EmailValidator(message="Invalid Email")])
@@ -31,7 +33,7 @@ class User(models.Model):
 
     def __str__(self) -> str:
         if self.role == 'L':
-            return f"Telegram id слушателя: {self.tg_id}"
+            return f"Слушатель: {self.tg_nickname}"
         elif self.role == 'S':
             return f'Спикер: {self.full_name}'
 
@@ -40,8 +42,8 @@ class Report(models.Model):
     report_title = models.CharField(max_length=50)
     planed_start_time = models.TimeField()
     planed_end_time = models.TimeField()
-    actual_start_time = models.TimeField(blank=True)
-    actual_end_time = models.TimeField(blank=True)
+    actual_start_time = models.TimeField(blank=True, null=True)
+    actual_end_time = models.TimeField(blank=True, null=True)
     event = models.ForeignKey(Event, on_delete=models.CASCADE)
     speaker = models.ForeignKey(User, on_delete=models.CASCADE)
 
