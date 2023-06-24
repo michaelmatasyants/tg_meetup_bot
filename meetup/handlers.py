@@ -9,6 +9,7 @@ from texts import TEXTS
 
 from temporary_data import speakers, speakers_id, reports, event, event_program
 
+import os
 from aiogram import Bot, Router
 from aiogram.types import Message, KeyboardButton, ReplyKeyboardRemove
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
@@ -18,15 +19,18 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import default_state
 
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'meetup.settings')
+os.environ['DJANGO_ALLOW_ASYNC_UNSAFE'] = 'true'
+import django
+from django.conf import settings
 
+if not settings.configured:
+    django.setup()
+
+from mainapp.models import Event, User, Report, Question
 
 bot = Bot(BOT_TOKEN)
 router = Router()
-
-
-# TODO: здесь будут функции для запросов в бд
-def get_speakers(Speaker):
-    pass
 
 
 class FSM(StatesGroup):
@@ -54,6 +58,8 @@ async def process_contact_organizer(message: Message, state: FSMContext):
 @router.message(Text(text='Спикер'))
 async def process_speaker_greeting(message: Message, state: FSMContext):
     # TODO запрос в БД с данными о спикерах
+    speakers = User.objects.filter(role='S')
+    print(speakers)
     if message.from_user.id in speakers_id:
         await message.answer(text=TEXTS['speaker_greeting'].format(message.from_user.first_name),  # TODO здесь необходимо подтянуть имя спикера
                              reply_markup=next_keyboard)
