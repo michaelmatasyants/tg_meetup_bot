@@ -1,12 +1,14 @@
 from config import BOT_TOKEN
 from keyboards import (role_selection_keyboard, get_id_keyboard, next_keyboard,
-                       kb_builder)
+                       kb_builder, home_button, start_report_keyboard,
+                       end_report_keyboard, go_home_keyboard)
 from texts import TEXTS
 
 from temporary_data import speakers, reports
 
 from aiogram import Bot, Router
-from aiogram.types import Message, CallbackQuery, InlineKeyboardButton
+from aiogram.types import Message, CallbackQuery, KeyboardButton, ReplyKeyboardRemove
+from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from aiogram.filters import CommandStart, Text, StateFilter
 from aiogram.filters.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -30,16 +32,22 @@ class FSM(StatesGroup):
 
 
 @router.message(CommandStart())
+@router.message(Text(text='Вернуться в начало'))
 async def process_start_command(message: Message, state: FSMContext):
     await message.answer(text=TEXTS['greeting'],
                          reply_markup=role_selection_keyboard)
     await state.set_state(default_state)
 
 
+@router.message(Text(text='Написать организатору'))
+async def process_contact_organizer(message: Message, state: FSMContext):
+    await message.answer(text='<Контакты организатора>')
+
+
 # ветка спикера
 # @router.message(StateFilter(default_state), Text(text='Спикер'))
 @router.message(Text(text='Спикер'))
-async def speaker_greeting(message: Message, state: FSMContext):
+async def process_speaker_greeting(message: Message, state: FSMContext):
     # TODO запрос в БД с данными о спикерах
     if message.from_user.id in speakers:
         await message.answer(text=TEXTS['speaker_greeting'].format(message.from_user.first_name),  # TODO здесь необходимо подтянуть имя спикера
@@ -51,23 +59,48 @@ async def speaker_greeting(message: Message, state: FSMContext):
 
 
 # @router.callback_query(StateFilter(default_state), Text(text='get_id'))
-@router.callback_query(Text(text='get_id'))
-async def get_id(callback: CallbackQuery):
-    await callback.message.answer(
-        text=f'Ваш telegram id:\n{callback.from_user.id}')
+@router.message(Text(text='Узнать свой telegram id'))
+async def get_id(message: Message):
+    await message.answer(text=f'Ваш telegram id:\n{message.from_user.id}')
 
 
 # @router.callback_query(StateFilter(FSM.speaker_state), Text(text='next'))
-@router.callback_query(Text(text='next'))
-async def display_reports(callback: CallbackQuery):
+@router.message(Text(text='Далее'))
+async def display_reports(message: Message):
     text = 'Выберите доклад из списка запланированных мероприятий, чтобы начать доклад или прочитать вопросы по докладу:\n'
     # запрос в БД для получения списка докладов
-    for report in reports:
-        text += TEXTS['reports'].format(reports.index(report) + 1, report['Тема доклада'], report['Дата и время'], report['Место проведения'])
-    buttons = [InlineKeyboardButton(text=report['Тема доклада'], callback_data=report['Тема доклада']) for report in reports]
-    keyboard = kb_builder.row(*buttons, width=1)
-    # await callback.answer()
-    await callback.message.answer(text=text, reply_markup=keyboard.as_markup())
+    kb_builder = ReplyKeyboardBuilder()
+    for count, report in enumerate(reports, start=1):
+        text += TEXTS['reports'].format(count, report['Тема доклада'], report['Дата и время'], report['Место проведения'])
+    buttons = [KeyboardButton(text=f'№{count} {report["Тема доклада"]}') for count, report in enumerate(reports, start=1)]
+    kb_builder.row(*buttons, width=1)
+    kb_builder.row(home_button)
+    await message.answer(text=text, reply_markup=kb_builder.as_markup(resize_keyboard=True))
+
+
+@router.message(lambda msg: msg.text.startswith('№'))
+async def process_report_selection(message: Message):
+    for element in reports:
+        if element['Тема доклада'] == message.text[3:]:
+            report = element
+    text = TEXTS['report'].format(report['Тема доклада'], report['Дата и время'], report['Место проведения'])
+    await message.answer(text=text, reply_markup=start_report_keyboard)
+
+
+@router.message(Text(text='Начать доклад'))
+async def start_report(message: Message):
+    # TODO запись в БД с временем начала
+    await message.answer(text='Вы начали доклад. Когда доклад будет завершен, вы можете приступить к ответам на вопросы слушателей.',
+                         reply_markup=end_report_keyboard)
+
+
+@router.message(Text(text='Завершить доклад'))
+async def end_report(message: Message):
+    # TODO запись в БД с временем завершения доклада
+    # TODO получить вопросы по докладу
+    # questions =
+    await message.answer(text='<Вопросы слушателей>',
+                         reply_markup=go_home_keyboard)
 
 
 # print(callback.json(indent=4, exclude_none=True))
