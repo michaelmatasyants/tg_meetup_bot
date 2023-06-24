@@ -7,7 +7,7 @@ from keyboards import (homepage_button, event_homepage_button,
                        show_event_program_button)
 from texts import TEXTS
 
-from temporary_data import speakers, speakers_id, reports, event, event_program
+from temporary_data import speakers, reports, event, event_program
 
 import os
 from aiogram import Bot, Router
@@ -57,11 +57,8 @@ async def process_contact_organizer(message: Message, state: FSMContext):
 # @router.message(StateFilter(default_state), Text(text='Спикер'))
 @router.message(Text(text='Спикер'))
 async def process_speaker_greeting(message: Message, state: FSMContext):
-    # TODO запрос в БД с данными о спикерах
-    speakers = User.objects.filter(role='S')
-    print(speakers)
-    if message.from_user.id in speakers_id:
-        await message.answer(text=TEXTS['speaker_greeting'].format(message.from_user.first_name),  # TODO здесь необходимо подтянуть имя спикера
+    if speaker := User.objects.filter(tg_id=message.from_user.id):
+        await message.answer(text=TEXTS['speaker_greeting'].format(speaker[0].full_name),
                              reply_markup=next_keyboard)
         # await state.set_state(FSM.speaker_state)
     else:
@@ -79,11 +76,11 @@ async def process_get_id(message: Message):
 @router.message(Text(text='Далее'))
 async def process_display_reports(message: Message):
     text = 'Выберите доклад из списка запланированных мероприятий, чтобы начать доклад или прочитать вопросы по докладу:\n'
-    # запрос в БД для получения списка докладов
+    reports = Report.objects.filter(speaker__tg_id=message.from_user.id)
     kb_builder = ReplyKeyboardBuilder()
     for count, report in enumerate(reports, start=1):
-        text += TEXTS['reports'].format(count, report['Тема доклада'], report['Дата и время'], report['Место проведения'])
-    buttons = [KeyboardButton(text=f'№{count} {report["Тема доклада"]}') for count, report in enumerate(reports, start=1)]
+        text += TEXTS['reports'].format(count, report.report_title, report.event.date, report.planed_start_time, report.event.place)
+    buttons = [KeyboardButton(text=f'№{count} {report.report_title}') for count, report in enumerate(reports, start=1)]
     kb_builder.row(*buttons, width=1)
     kb_builder.row(homepage_button)
     await message.answer(text=text, reply_markup=kb_builder.as_markup(resize_keyboard=True))
@@ -91,10 +88,8 @@ async def process_display_reports(message: Message):
 
 @router.message(lambda msg: msg.text.startswith('№'))
 async def process_report_selection(message: Message):
-    for element in reports:
-        if element['Тема доклада'] == message.text[3:]:
-            report = element
-    text = TEXTS['report'].format(report['Тема доклада'], report['Дата и время'], report['Место проведения'])
+    report = Report.objects.get(report_title=message.text[3:])
+    text = TEXTS['report'].format(report.report_title, report.event.date, report.planed_start_time, report.event.place)
     await message.answer(text=text, reply_markup=start_report_keyboard)
 
 

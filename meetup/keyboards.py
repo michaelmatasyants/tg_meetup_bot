@@ -18,10 +18,7 @@ show_event_program_button = KeyboardButton(text='Программа меропр
 ask_speaker_button = KeyboardButton(text='Задать вопрос спикеру')
 event_homepage_button = KeyboardButton(text='На главную')
 
-role_selection_keyboard = ReplyKeyboardMarkup(
-    keyboard=[[speaker_button], [guest_button]],
-    resize_keyboard=True)
-
+role_selection_keyboard = ReplyKeyboardMarkup(keyboard=[[speaker_button], [guest_button]], resize_keyboard=True)
 get_id_keyboard = ReplyKeyboardMarkup(keyboard=[[get_id_button], [contact_organizer_button], [homepage_button]], resize_keyboard=True)
 next_keyboard = ReplyKeyboardMarkup(keyboard=[[next_button], [contact_organizer_button], [homepage_button]], resize_keyboard=True)
 start_report_keyboard = ReplyKeyboardMarkup(keyboard=[[start_report_button], [contact_organizer_button], [homepage_button]], resize_keyboard=True)
