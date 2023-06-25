@@ -108,9 +108,10 @@ async def process_start_report(callback: CallbackQuery):
     report.save()
     btn = InlineKeyboardButton(text='Завершить доклад', callback_data='$#' + report.report_title)
     kb = InlineKeyboardMarkup(inline_keyboard=[[btn]])
-    await callback.message.answer(text='Вы начали доклад. Когда доклад будет завершен, вы можете приступить к ответам на вопросы слушателей.', reply_markup=ReplyKeyboardRemove())
-    await callback.message.answer(text='Не забудьте нажать кнопку ниже, когда закончите доклад 👇',
-                                  reply_markup=kb)
+    new_text = callback.message.text + '\n\nВы начали доклад. Когда доклад будет завершен, вы можете приступить к ответам на вопросы слушателей.'
+    await callback.message.edit_text(text=new_text, reply_markup=kb)
+    await callback.message.answer(text='Не забудьте нажать кнопку, когда закончите доклад 👆',
+                                  reply_markup=ReplyKeyboardRemove())
 
 
 @router.callback_query(lambda callback: callback.data.startswith('$#'))
@@ -118,12 +119,12 @@ async def process_end_report(callback: CallbackQuery):
     report = Report.objects.get(report_title=callback.data[2:])
     report.actual_end_time = datetime.now()
     report.save()
-    # TODO получить вопросы по докладу
     questions = Question.objects.filter(report=report)
-    print(questions)
-    text = '<Вопросы слушателей>'
-    await callback.answer(text=text,
-                          reply_markup=go_home_keyboard)
+    text = 'Вопросы слушателей:\n'
+    for count, question in enumerate(questions, start=1):
+        text += TEXTS['question'].format(count, question.user.tg_nickname, question.question_title, question.question_text)
+    await callback.message.answer(text=text,
+                                  reply_markup=go_home_keyboard)
 
 
 # ветка гостя
