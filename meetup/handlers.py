@@ -7,8 +7,6 @@ from keyboards import (homepage_button, event_homepage_button,
                        show_event_program_button)
 from texts import TEXTS
 
-from temporary_data import speakers, event, event_program
-
 import os
 from datetime import datetime
 from aiogram import Bot, Router
@@ -148,8 +146,12 @@ async def enter_mail(message: Message, state: FSMContext):
         if not user.email:
             user.email = message.text
             user.save()
-    await message.answer(text=TEXTS['success_registration'].format(event['topic'], event['date'], event['place'], event['time']),
-                         reply_markup=event_keyboard)
+    if event := Event.objects.filter(date=datetime.now().date()):
+        event = event[0]
+        await message.answer(text=TEXTS['success_registration'].format(event.event_name, event.date, event.place, event.start_time),
+                             reply_markup=event_keyboard)
+    else:
+        await message.answer(text='На сегодня нет запланированных мероприятий', reply_markup=go_home_keyboard)
     await state.set_state(default_state)
 
 
@@ -172,8 +174,11 @@ async def process_without_email(message: Message, state: FSMContext):
 
 @router.message(Text(text='Спикеры'))
 async def process_show_speakers(message: Message, state: FSMContext):
+    event = Event.objects.filter(date=datetime.now().date())[0]
+    reports = Report.objects.filter(event=event)
+    speakers = [report.speaker for report in reports]
     kb_builder = ReplyKeyboardBuilder()
-    buttons = [KeyboardButton(text=speaker['name']) for speaker in speakers]
+    buttons = [KeyboardButton(text=speaker.full_name) for speaker in speakers]
     kb_builder.row(*buttons, width=2)
     kb_builder.row(show_event_program_button)
     kb_builder.row(event_homepage_button)
@@ -184,7 +189,12 @@ async def process_show_speakers(message: Message, state: FSMContext):
 async def process_show_program(message: Message, state: FSMContext):
     kb_builder = ReplyKeyboardBuilder()
     kb_builder.row(event_homepage_button)
-    await message.answer(text=event_program,
+    event = Event.objects.filter(date=datetime.now().date())[0]
+    reports = Report.objects.filter(event=event)
+    text = f'Программа мероприятия "{event.event_name}":\nДата: {event.date}\nМесто:\n{event.place}\nДоклады:\n\n'
+    for count, report in enumerate(reports, start=1):
+        text += TEXTS['reports'].format(count, report.planed_start_time, report.report_title, report.speaker)
+    await message.answer(text=text,
                          reply_markup=kb_builder.as_markup(resize_keyboard=True))
 
 
