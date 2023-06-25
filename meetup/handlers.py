@@ -12,11 +12,12 @@ from temporary_data import speakers, event, event_program
 import os
 from datetime import datetime
 from aiogram import Bot, Router
-from aiogram.types import Message, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, ReplyKeyboardRemove
+from aiogram.types import (Message, KeyboardButton, InlineKeyboardButton,
+                           InlineKeyboardMarkup, CallbackQuery,
+                           ReplyKeyboardRemove)
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from aiogram.filters import CommandStart, Text, StateFilter
 from aiogram.filters.state import State, StatesGroup
-from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import default_state
 
@@ -32,10 +33,6 @@ from mainapp.models import Event, User, Report, Question
 
 bot = Bot(BOT_TOKEN)
 router = Router()
-
-
-def f():
-    pass
 
 
 class FSM(StatesGroup):
@@ -126,12 +123,10 @@ async def process_end_report(callback: CallbackQuery):
 
 
 # ветка гостя
-# @router.message(StateFilter(default_state, FSM.speaker_state), Text(text='Гость мероприятия'))
 @router.message(Text(text='Гость мероприятия'))
 async def process_guest_greeting(message: Message, state: FSMContext):
     await message.answer(text=TEXTS['guest_greeting'].format(message.from_user.first_name),
                          reply_markup=guest_registration_keyboard)
-    # await state.set_state(FSM.guest_state)
 
 
 @router.message(Text(text='Ввести Email'))
@@ -143,8 +138,16 @@ async def process_enter_email(message: Message, state: FSMContext):
 
 @router.message(StateFilter(FSM.enter_email_state))
 async def enter_mail(message: Message, state: FSMContext):
-    email = message.text
-    print('email:', email)
+    if str(message.from_user.id) not in User.objects.all().values_list('tg_id', flat=True):
+        User.objects.update_or_create(tg_id=message.from_user.id, tg_nickname=message.from_user.username, email=message.text)
+    else:
+        user = User.objects.get(tg_id=str(message.from_user.id))
+        if not user.tg_nickname:
+            user.tg_nickname = message.from_user.username
+            user.save()
+        if not user.email:
+            user.email = message.text
+            user.save()
     await message.answer(text=TEXTS['success_registration'].format(event['topic'], event['date'], event['place'], event['time']),
                          reply_markup=event_keyboard)
     await state.set_state(default_state)
@@ -154,8 +157,17 @@ async def enter_mail(message: Message, state: FSMContext):
 async def process_without_email(message: Message, state: FSMContext):
     if str(message.from_user.id) not in User.objects.all().values_list('tg_id', flat=True):
         User.objects.update_or_create(tg_id=message.from_user.id, tg_nickname=message.from_user.username)
-    await message.answer(text=TEXTS['success_registration'].format(event['topic'], event['date'], event['place'], event['time']),
-                         reply_markup=event_keyboard)
+    else:
+        user = User.objects.get(tg_id=str(message.from_user.id))
+        if not user.tg_nickname:
+            user.tg_nickname = message.from_user.username
+            user.save()
+    if event := Event.objects.filter(date=datetime.now().date()):
+        event = event[0]
+        await message.answer(text=TEXTS['success_registration'].format(event.event_name, event.date, event.place, event.start_time),
+                             reply_markup=event_keyboard)
+    else:
+        await message.answer(text='На сегодня нет запланированных мероприятий', reply_markup=go_home_keyboard)
 
 
 @router.message(Text(text='Спикеры'))
