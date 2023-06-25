@@ -26,5 +26,6 @@ next_keyboard = ReplyKeyboardMarkup(keyboard=[[next_button], [contact_organizer_
 start_report_inline_keyboard = InlineKeyboardMarkup(inline_keyboard=[[start_report_inline_button]])
 end_report_keyboard = ReplyKeyboardMarkup(keyboard=[[end_report_button]], resize_keyboard=True)
 go_home_keyboard = ReplyKeyboardMarkup(keyboard=[[homepage_button]], resize_keyboard=True)
+go_home_contact_organizer_keyboard = ReplyKeyboardMarkup(keyboard=[[contact_organizer_button], [homepage_button]], resize_keyboard=True)
 guest_registration_keyboard = ReplyKeyboardMarkup(keyboard=[[enter_email_button], [without_email_button], [homepage_button]], resize_keyboard=True)
 event_keyboard = ReplyKeyboardMarkup(keyboard=[[show_speakers_button], [show_event_program_button], [ask_speaker_button], [homepage_button]], resize_keyboard=True)

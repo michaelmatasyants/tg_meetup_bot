@@ -1,13 +1,13 @@
 from config import BOT_TOKEN
-from keyboards import (role_selection_keyboard, get_id_keyboard, next_keyboard, end_report_keyboard,
-                    #    start_report_keyboard, end_report_keyboard,
+from keyboards import (role_selection_keyboard, get_id_keyboard, next_keyboard,
                        go_home_keyboard, event_keyboard,
-                       guest_registration_keyboard, start_report_inline_keyboard)
+                       guest_registration_keyboard,
+                       go_home_contact_organizer_keyboard)
 from keyboards import (homepage_button, event_homepage_button,
                        show_event_program_button)
 from texts import TEXTS
 
-from temporary_data import speakers, reports, event, event_program
+from temporary_data import speakers, event, event_program
 
 import os
 from datetime import datetime
@@ -59,36 +59,34 @@ async def process_contact_organizer(message: Message, state: FSMContext):
 
 
 # ветка спикера
-# @router.message(StateFilter(default_state), Text(text='Спикер'))
 @router.message(Text(text='Спикер'))
 async def process_speaker_greeting(message: Message, state: FSMContext):
-    if speaker := User.objects.filter(tg_id=message.from_user.id):
+    if speaker := User.objects.filter(tg_id=message.from_user.id, role='S'):
         await message.answer(text=TEXTS['speaker_greeting'].format(speaker[0].full_name),
                              reply_markup=next_keyboard)
-        # await state.set_state(FSM.speaker_state)
     else:
         await message.answer(text=TEXTS['speaker_not_recognized'],
                              reply_markup=get_id_keyboard)
 
 
-# @router.callback_query(StateFilter(default_state), Text(text='get_id'))
 @router.message(Text(text='Узнать свой telegram id'))
 async def process_get_id(message: Message):
     await message.answer(text=f'Ваш telegram id:\n{message.from_user.id}')
 
 
-# @router.callback_query(StateFilter(FSM.speaker_state), Text(text='next'))
 @router.message(Text(text='Далее'))
 async def process_display_reports(message: Message):
     text = 'Выберите доклад из списка запланированных мероприятий, чтобы начать доклад или прочитать вопросы по докладу:\n'
-    reports = Report.objects.filter(speaker__tg_id=message.from_user.id)
-    kb_builder = ReplyKeyboardBuilder()
-    for count, report in enumerate(reports, start=1):
-        text += TEXTS['reports'].format(count, report.report_title, report.event.date, report.planed_start_time, report.event.place)
-    buttons = [KeyboardButton(text=f'№{count} {report.report_title}') for count, report in enumerate(reports, start=1)]
-    kb_builder.row(*buttons, width=1)
-    kb_builder.row(homepage_button)
-    await message.answer(text=text, reply_markup=kb_builder.as_markup(resize_keyboard=True))
+    if reports := Report.objects.filter(speaker__tg_id=message.from_user.id, event__date=datetime.now().date()):
+        kb_builder = ReplyKeyboardBuilder()
+        for count, report in enumerate(reports, start=1):
+            text += TEXTS['reports'].format(count, report.report_title, report.event.date, report.planed_start_time, report.event.place)
+        buttons = [KeyboardButton(text=f'№{count} {report.report_title}') for count, report in enumerate(reports, start=1)]
+        kb_builder.row(*buttons, width=1)
+        kb_builder.row(homepage_button)
+        await message.answer(text=text, reply_markup=kb_builder.as_markup(resize_keyboard=True))
+    else:
+        await message.answer(text='У вас нет запланированных докладов на сегодня.', reply_markup=go_home_contact_organizer_keyboard)
 
 
 @router.message(lambda msg: msg.text.startswith('№'))
@@ -154,6 +152,8 @@ async def enter_mail(message: Message, state: FSMContext):
 
 @router.message(Text(text=['Продолжить без Email', 'На главную']))
 async def process_without_email(message: Message, state: FSMContext):
+    if str(message.from_user.id) not in User.objects.all().values_list('tg_id', flat=True):
+        User.objects.update_or_create(tg_id=message.from_user.id, tg_nickname=message.from_user.username)
     await message.answer(text=TEXTS['success_registration'].format(event['topic'], event['date'], event['place'], event['time']),
                          reply_markup=event_keyboard)
 
