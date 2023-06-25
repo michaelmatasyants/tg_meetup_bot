@@ -1,8 +1,8 @@
 from config import BOT_TOKEN
-from keyboards import (role_selection_keyboard, get_id_keyboard, next_keyboard,
-                       start_report_keyboard, end_report_keyboard,
+from keyboards import (role_selection_keyboard, get_id_keyboard, next_keyboard, end_report_keyboard,
+                    #    start_report_keyboard, end_report_keyboard,
                        go_home_keyboard, event_keyboard,
-                       guest_registration_keyboard)
+                       guest_registration_keyboard, start_report_inline_keyboard)
 from keyboards import (homepage_button, event_homepage_button,
                        show_event_program_button)
 from texts import TEXTS
@@ -10,8 +10,9 @@ from texts import TEXTS
 from temporary_data import speakers, reports, event, event_program
 
 import os
+from datetime import datetime
 from aiogram import Bot, Router
-from aiogram.types import Message, KeyboardButton, ReplyKeyboardRemove
+from aiogram.types import Message, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, ReplyKeyboardRemove
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from aiogram.filters import CommandStart, Text, StateFilter
 from aiogram.filters.state import State, StatesGroup
@@ -31,6 +32,10 @@ from mainapp.models import Event, User, Report, Question
 
 bot = Bot(BOT_TOKEN)
 router = Router()
+
+
+def f():
+    pass
 
 
 class FSM(StatesGroup):
@@ -90,23 +95,35 @@ async def process_display_reports(message: Message):
 async def process_report_selection(message: Message):
     report = Report.objects.get(report_title=message.text[3:])
     text = TEXTS['report'].format(report.report_title, report.event.date, report.planed_start_time, report.event.place)
-    await message.answer(text=text, reply_markup=start_report_keyboard)
+    btn = InlineKeyboardButton(text='Начать доклад', callback_data=report.report_title)
+    kb = InlineKeyboardMarkup(inline_keyboard=[[btn]])
+    await message.answer(text=text, reply_markup=kb)
 
 
-@router.message(Text(text='Начать доклад'))
-async def process_start_report(message: Message):
-    # TODO запись в БД с временем начала
-    await message.answer(text='Вы начали доклад. Когда доклад будет завершен, вы можете приступить к ответам на вопросы слушателей.',
-                         reply_markup=end_report_keyboard)
+@router.callback_query(lambda callback: callback.data in Report.objects.all().values_list('report_title', flat=True))
+async def process_start_report(callback: CallbackQuery):
+    await callback.answer()
+    report = Report.objects.get(report_title=callback.data)
+    report.actual_start_time = datetime.now()
+    report.save()
+    btn = InlineKeyboardButton(text='Завершить доклад', callback_data='$#' + report.report_title)
+    kb = InlineKeyboardMarkup(inline_keyboard=[[btn]])
+    await callback.message.answer(text='Вы начали доклад. Когда доклад будет завершен, вы можете приступить к ответам на вопросы слушателей.', reply_markup=ReplyKeyboardRemove())
+    await callback.message.answer(text='Не забудьте нажать кнопку ниже, когда закончите доклад 👇',
+                                  reply_markup=kb)
 
 
-@router.message(Text(text='Завершить доклад'))
-async def process_end_report(message: Message):
-    # TODO запись в БД с временем завершения доклада
+@router.callback_query(lambda callback: callback.data.startswith('$#'))
+async def process_end_report(callback: CallbackQuery):
+    report = Report.objects.get(report_title=callback.data[2:])
+    report.actual_end_time = datetime.now()
+    report.save()
     # TODO получить вопросы по докладу
-    questions = '<Вопросы слушателей>'
-    await message.answer(text=questions,
-                         reply_markup=go_home_keyboard)
+    questions = Question.objects.filter(report=report)
+    print(questions)
+    text = '<Вопросы слушателей>'
+    await callback.answer(text=text,
+                          reply_markup=go_home_keyboard)
 
 
 # ветка гостя
