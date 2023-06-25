@@ -13,7 +13,7 @@ from aiogram import Bot, Router
 from aiogram.types import (Message, KeyboardButton, InlineKeyboardButton,
                            InlineKeyboardMarkup, CallbackQuery,
                            ReplyKeyboardRemove)
-from aiogram.utils.keyboard import ReplyKeyboardBuilder
+from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
 from aiogram.filters import CommandStart, Text, StateFilter
 from aiogram.filters.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
@@ -172,17 +172,38 @@ async def process_without_email(message: Message, state: FSMContext):
         await message.answer(text='На сегодня нет запланированных мероприятий', reply_markup=go_home_keyboard)
 
 
+# @router.message(Text(text='Спикеры'))
+# async def process_show_speakers(message: Message, state: FSMContext):
+#     event = Event.objects.filter(date=datetime.now().date())[0]
+#     reports = Report.objects.filter(event=event)
+#     speakers = [report.speaker for report in reports]
+#     kb_builder = ReplyKeyboardBuilder()
+#     buttons = [KeyboardButton(text=speaker.full_name) for speaker in speakers]
+#     kb_builder.row(*buttons, width=2)
+#     kb_builder.row(show_event_program_button)
+#     kb_builder.row(event_homepage_button)
+#     await message.answer(text=TEXTS['show_speakers'], reply_markup=kb_builder.as_markup(resize_keyboard=True))
+
+
 @router.message(Text(text='Спикеры'))
 async def process_show_speakers(message: Message, state: FSMContext):
     event = Event.objects.filter(date=datetime.now().date())[0]
     reports = Report.objects.filter(event=event)
     speakers = [report.speaker for report in reports]
-    kb_builder = ReplyKeyboardBuilder()
-    buttons = [KeyboardButton(text=speaker.full_name) for speaker in speakers]
-    kb_builder.row(*buttons, width=2)
-    kb_builder.row(show_event_program_button)
-    kb_builder.row(event_homepage_button)
+    kb_builder = InlineKeyboardBuilder()
+    buttons = [InlineKeyboardButton(text=speaker.full_name, callback_data=speaker.full_name) for speaker in speakers]
+    kb_builder.row(*buttons, width=1)
+    # kb_builder.row(show_event_program_button)
+    # kb_builder.row(event_homepage_button)
     await message.answer(text=TEXTS['show_speakers'], reply_markup=kb_builder.as_markup(resize_keyboard=True))
+
+
+@router.callback_query(lambda callback: callback.data in User.objects.filter(role='S').values_list('full_name', flat=True))
+async def process_show_speaker(callback: CallbackQuery):
+    speaker = User.objects.get(full_name=callback.data)
+    await callback.answer()
+    await callback.message.answer(text=TEXTS['speaker'].format(speaker.full_name, speaker.workplace, speaker.experience))
+    # 'speaker': 'ФИО: {}\nМесто работы: {}\nОпыт:{}'
 
 
 @router.message(Text(text='Программа мероприятия'))
@@ -210,7 +231,6 @@ async def process_ask_question(message: Message, state: FSMContext):
 @router.message(StateFilter(FSM.enter_question_state))
 async def enter_question(message: Message, state: FSMContext):
     question = message.text
-    print('question:', question)
     kb_builder = ReplyKeyboardBuilder()
     kb_builder.row(event_homepage_button)
     await message.answer(text='Спасибо за вопрос.\nСпикер ответит на него после завершения доклада.',
@@ -231,6 +251,7 @@ async def enter_question(message: Message, state: FSMContext):
 # enter_mail
 # process_process_without_email
 # process_show_speakers
+# process_show_speaker
 # process_show_program
 # process_ask_question
 # enter_question
