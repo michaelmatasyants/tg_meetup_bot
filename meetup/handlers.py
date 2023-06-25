@@ -1,10 +1,8 @@
 from config import BOT_TOKEN
 from keyboards import (role_selection_keyboard, get_id_keyboard, next_keyboard,
                        go_home_keyboard, event_keyboard,
-                       guest_registration_keyboard,
-                       go_home_contact_organizer_keyboard)
-from keyboards import (homepage_button, event_homepage_button,
-                       show_event_program_button)
+                       guest_registration_keyboard, event_homepage_keyboard,
+                       go_home_contact_organizer_keyboard, homepage_button)
 from texts import TEXTS
 
 import os
@@ -34,8 +32,6 @@ router = Router()
 
 
 class FSM(StatesGroup):
-    speaker_state = State()
-    guest_state = State()
     enter_email_state = State()
     enter_question_state = State()
 
@@ -115,7 +111,7 @@ async def process_end_report(callback: CallbackQuery):
     questions = Question.objects.filter(report=report)
     text = 'Вопросы слушателей:\n'
     for count, question in enumerate(questions, start=1):
-        text += TEXTS['question'].format(count, question.user.tg_nickname, question.question_title, question.question_text)
+        text += TEXTS['question'].format(count, question.user.tg_nickname, question.question_text)
     await callback.message.answer(text=text,
                                   reply_markup=go_home_keyboard)
 
@@ -172,19 +168,6 @@ async def process_without_email(message: Message, state: FSMContext):
         await message.answer(text='На сегодня нет запланированных мероприятий', reply_markup=go_home_keyboard)
 
 
-# @router.message(Text(text='Спикеры'))
-# async def process_show_speakers(message: Message, state: FSMContext):
-#     event = Event.objects.filter(date=datetime.now().date())[0]
-#     reports = Report.objects.filter(event=event)
-#     speakers = [report.speaker for report in reports]
-#     kb_builder = ReplyKeyboardBuilder()
-#     buttons = [KeyboardButton(text=speaker.full_name) for speaker in speakers]
-#     kb_builder.row(*buttons, width=2)
-#     kb_builder.row(show_event_program_button)
-#     kb_builder.row(event_homepage_button)
-#     await message.answer(text=TEXTS['show_speakers'], reply_markup=kb_builder.as_markup(resize_keyboard=True))
-
-
 @router.message(Text(text='Спикеры'))
 async def process_show_speakers(message: Message, state: FSMContext):
     event = Event.objects.filter(date=datetime.now().date())[0]
@@ -193,8 +176,6 @@ async def process_show_speakers(message: Message, state: FSMContext):
     kb_builder = InlineKeyboardBuilder()
     buttons = [InlineKeyboardButton(text=speaker.full_name, callback_data=speaker.full_name) for speaker in speakers]
     kb_builder.row(*buttons, width=1)
-    # kb_builder.row(show_event_program_button)
-    # kb_builder.row(event_homepage_button)
     await message.answer(text=TEXTS['show_speakers'], reply_markup=kb_builder.as_markup(resize_keyboard=True))
 
 
@@ -203,57 +184,37 @@ async def process_show_speaker(callback: CallbackQuery):
     speaker = User.objects.get(full_name=callback.data)
     await callback.answer()
     await callback.message.answer(text=TEXTS['speaker'].format(speaker.full_name, speaker.workplace, speaker.experience))
-    # 'speaker': 'ФИО: {}\nМесто работы: {}\nОпыт:{}'
 
 
 @router.message(Text(text='Программа мероприятия'))
 async def process_show_program(message: Message, state: FSMContext):
-    kb_builder = ReplyKeyboardBuilder()
-    kb_builder.row(event_homepage_button)
     event = Event.objects.filter(date=datetime.now().date())[0]
     reports = Report.objects.filter(event=event)
     text = f'Программа мероприятия "{event.event_name}":\nДата: {event.date}\nМесто:\n{event.place}\nДоклады:\n\n'
     for count, report in enumerate(reports, start=1):
         text += TEXTS['reports'].format(count, report.planed_start_time, report.report_title, report.speaker)
     await message.answer(text=text,
-                         reply_markup=kb_builder.as_markup(resize_keyboard=True))
+                         reply_markup=event_homepage_keyboard)
 
 
 @router.message(Text(text='Задать вопрос спикеру'))
 async def process_ask_question(message: Message, state: FSMContext):
-    kb_builder = ReplyKeyboardBuilder()
-    kb_builder.row(event_homepage_button)
-    await message.answer(text='Чтобы задать вопрос спикеру, который сейчас читает доклад введите его ниже.\n\n<Спикер>\n<Тема доклада>',
-                         reply_markup=kb_builder.as_markup(resize_keyboard=True))
-    await state.set_state(FSM.enter_question_state)
+    if report := Report.objects.filter(actual_start_time__isnull=False, actual_end_time__isnull=True):
+        await message.answer(text=f'Сейчас выступает: {report[0].speaker.full_name}\nТема: {report[0].report_title}\n\nЧтобы задать вопрос спикеру, который сейчас читает доклад, отправьте его текстовым сообщением:',
+                             reply_markup=event_homepage_keyboard)
+        await state.set_state(FSM.enter_question_state)
+    else:
+        await message.answer(text='На данный момент никто не выступает!',
+                             reply_markup=event_homepage_keyboard)
 
 
 @router.message(StateFilter(FSM.enter_question_state))
 async def enter_question(message: Message, state: FSMContext):
-    question = message.text
-    kb_builder = ReplyKeyboardBuilder()
-    kb_builder.row(event_homepage_button)
-    await message.answer(text='Спасибо за вопрос.\nСпикер ответит на него после завершения доклада.',
-                         reply_markup=kb_builder.as_markup(resize_keyboard=True))
+    if report := Report.objects.filter(actual_start_time__isnull=False, actual_end_time__isnull=True):
+        Question.objects.create(question_text=message.text, user=User.objects.get(tg_id=message.from_user.id), report=report[0])
+        await message.answer(text='Спасибо за вопрос.\nСпикер ответит на него после завершения доклада.',
+                             reply_markup=event_homepage_keyboard)
+    else:
+        await message.answer(text='Извините, кажется спикер уже завершил свой доклад',
+                             reply_markup=event_homepage_keyboard)
     await state.set_state(default_state)
-
-
-# process_start_command
-# process_contact_organizer
-# process_speaker_greeting
-# process_get_id
-# process_display_reports
-# process_report_selection
-# process_start_report
-# process_end_report
-# process_guest_greeting
-# process_enter_email
-# enter_mail
-# process_process_without_email
-# process_show_speakers
-# process_show_speaker
-# process_show_program
-# process_ask_question
-# enter_question
-
-# print(message.json(indent=4, exclude_none=True))

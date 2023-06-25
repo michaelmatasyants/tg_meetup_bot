@@ -63,4 +63,4 @@ class Question(models.Model):
     report = models.ForeignKey(Report, on_delete=models.CASCADE)
 
     def __str__(self) -> str:
-        return f'{self.question_title}'
+        return f'{self.question_text[:25]}'
