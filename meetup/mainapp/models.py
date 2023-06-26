@@ -37,7 +37,7 @@ class User(models.Model):
         elif self.role == 'O':
             return f"Организатор: {self.tg_nickname}"
         elif self.role == 'S':
-            return f'Спикер: {self.full_name}'
+            return f'{self.full_name}'
 
 
 class Report(models.Model):
