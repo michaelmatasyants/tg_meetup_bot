@@ -34,6 +34,8 @@ class User(models.Model):
     def __str__(self) -> str:
         if self.role == 'L':
             return f"Слушатель: {self.tg_nickname}"
+        elif self.role == 'O':
+            return f"Организатор: {self.tg_nickname}"
         elif self.role == 'S':
             return f'Спикер: {self.full_name}'
 
