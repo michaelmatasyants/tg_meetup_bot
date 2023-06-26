@@ -171,7 +171,7 @@ async def process_without_email(message: Message, state: FSMContext):
 @router.message(Text(text='Спикеры'))
 async def process_show_speakers(message: Message, state: FSMContext):
     event = Event.objects.filter(date=datetime.now().date())[0]
-    reports = Report.objects.filter(event=event)
+    reports = Report.objects.filter(event=event).order_by('planed_start_time')
     speakers = [report.speaker for report in reports]
     kb_builder = InlineKeyboardBuilder()
     buttons = [InlineKeyboardButton(text=speaker.full_name, callback_data=speaker.full_name) for speaker in speakers]
@@ -189,7 +189,7 @@ async def process_show_speaker(callback: CallbackQuery):
 @router.message(Text(text='Программа мероприятия'))
 async def process_show_program(message: Message, state: FSMContext):
     event = Event.objects.filter(date=datetime.now().date())[0]
-    reports = Report.objects.filter(event=event)
+    reports = Report.objects.filter(event=event).order_by('planed_start_time')
     text = f'Программа мероприятия "{event.event_name}":\nДата: {event.date}\nМесто:\n{event.place}\nДоклады:\n\n'
     for count, report in enumerate(reports, start=1):
         text += TEXTS['reports'].format(count, report.planed_start_time, report.report_title, report.speaker)
