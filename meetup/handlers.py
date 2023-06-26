@@ -67,11 +67,11 @@ async def process_get_id(message: Message):
 
 @router.message(Text(text='Далее'))
 async def process_display_reports(message: Message):
-    text = 'Выберите доклад из списка запланированных мероприятий, чтобы начать доклад или прочитать вопросы по докладу:\n'
+    text = 'Выберите доклад из списка запланированных мероприятий, чтобы начать доклад или прочитать вопросы по докладу:\n\n'
     if reports := Report.objects.filter(speaker__tg_id=message.from_user.id, event__date=datetime.now().date()):
         kb_builder = ReplyKeyboardBuilder()
         for count, report in enumerate(reports, start=1):
-            text += TEXTS['reports'].format(count, report.report_title, report.event.date, report.planed_start_time, report.event.place)
+            text += TEXTS['reports_for_speaker'].format(count, report.event.date, report.planed_start_time, report.report_title, report.event.place)
         buttons = [KeyboardButton(text=f'№{count} {report.report_title}') for count, report in enumerate(reports, start=1)]
         kb_builder.row(*buttons, width=1)
         kb_builder.row(homepage_button)
@@ -192,7 +192,7 @@ async def process_show_program(message: Message, state: FSMContext):
     reports = Report.objects.filter(event=event).order_by('planed_start_time')
     text = f'Программа мероприятия "{event.event_name}":\nДата: {event.date}\nМесто:\n{event.place}\nДоклады:\n\n'
     for count, report in enumerate(reports, start=1):
-        text += TEXTS['reports'].format(count, report.planed_start_time, report.report_title, report.speaker)
+        text += TEXTS['reports_for_listener'].format(count, report.planed_start_time, report.report_title, report.speaker)
     await message.answer(text=text,
                          reply_markup=event_homepage_keyboard)
 
